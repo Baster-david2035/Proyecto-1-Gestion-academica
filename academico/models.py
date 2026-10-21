@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 class Carrera(models.Model):
     codigo = models.CharField(max_length=10, unique=True)
@@ -30,4 +31,23 @@ class PeriodoLectivo(models.Model):
 
     def __str__(self):
         return self.nombre
-    
+
+class Grupo(models.Model):
+    curso = models.ForeignKey(Curso, on_delete=models.CASCADE)
+    periodo = models.ForeignKey(PeriodoLectivo, on_delete=models.CASCADE)
+    numero_grupo = models.PositiveIntegerField(default=1)
+    profesor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        limit_choices_to={'perfilusuario__rol': 'PROFESOR'},
+    )
+    cupo_maximo = models.PositiveIntegerField(default=30)
+
+    class Meta:
+        unique_together = ('curso', 'periodo', 'numero_grupo')
+
+    def __str__(self):
+        return (
+            f'{self.curso.codigo} - Grupo {self.numero_grupo} ({self.periodo})'
+        )
