@@ -22,10 +22,4 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # Ruta para obtener el token de autenticación (Login)
     path('api/token/', obtain_auth_token, name='api_token_auth'),
-    # Inclusión de las rutas de cada módulo
-    path('api/usuarios/', include('usuarios.urls')),
-    path('api/academico/', include('academico.urls')),
-    path('api/matricula/', include('matricula.urls')),
-    path('api/calificaciones/', include('calificaciones.urls')),
-    path('api/horarios/', include('horarios.urls')),
 ]

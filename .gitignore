@@ -1,2 +1,8 @@
 /venv
 /.env
+/usuarios/__pycache__
+/academico/__pycache__
+/calificaciones/__pycache__
+/matricula/__pycache__
+/horarios/__pycache__
+/db.sqlite3
