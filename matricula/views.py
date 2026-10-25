@@ -6,7 +6,7 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 
 from .models import Matricula
 from .serializers import MatriculaSerializer
-from usuarios.views import es_administrador, obtener_rol
+from .views import es_administrador, obtener_rol
 
 
 class PaginacionMatricula(PageNumberPagination):
