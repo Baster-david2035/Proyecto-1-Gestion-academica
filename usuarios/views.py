@@ -17,7 +17,7 @@ def es_administrador(usuario):
         return False
 
 class PermisoPerfilUsuario(BasePermission):
-     def has_permission(self, request, view):
+    def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
 
@@ -26,18 +26,17 @@ class PermisoPerfilUsuario(BasePermission):
 
         return es_administrador(request.user)
 
-     def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request, view, obj):
         if es_administrador(request.user):
-             return True
+            return True
 
         return (
             request.method in ("GET", "HEAD", "OPTIONS")
             and obj.user_id == request.user.id
-         )
+        )
 
 
 def es_administrador(usuario):
-   
     if not usuario.is_authenticated:
         return False
 
@@ -51,8 +50,6 @@ def es_administrador(usuario):
 
 
 class PermisoPerfilUsuario(BasePermission):
-   
-
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
