@@ -1,87 +1,89 @@
-from rest_framework import viewsets
+from rest_framework import status
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from .models import PerfilUsuario
 from .serializers import PerfilUsuarioSerializer
 
-def es_administrador(usuario):
-    if not usuario.is_authenticated:
-        return False
 
-    if usuario.is_superuser:
-        return True
+def obtener_rol(usuario):
+    """
+    Obtiene el rol del usuario desde su perfil.
+    """
+    if usuario.is_superuser or usuario.is_staff:
+        return "ADMINISTRADOR"
 
     try:
-        return usuario.perfilusuario.rol == "ADMIN"
+        perfil = PerfilUsuario.objects.get(usuario=usuario)
+        return str(perfil.rol).upper()
     except PerfilUsuario.DoesNotExist:
-        return False
-
-class PermisoPerfilUsuario(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-
-        return es_administrador(request.user)
-
-    def has_object_permission(self, request, view, obj):
-        if es_administrador(request.user):
-            return True
-
-        return (
-            request.method in ("GET", "HEAD", "OPTIONS")
-            and obj.user_id == request.user.id
-        )
+        return "SIN_ROL"
 
 
 def es_administrador(usuario):
+    """
+    Comprueba si el usuario es administrador.
+    """
     if not usuario.is_authenticated:
         return False
 
-    if usuario.is_superuser:
-        return True
+    return (
+        usuario.is_superuser
+        or usuario.is_staff
+        or obtener_rol(usuario) in ("ADMIN", "ADMINISTRADOR")
+    )
 
+
+@api_view(["GET"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def mi_perfil(request):
+    """
+    Consulta el perfil del usuario autenticado.
+    """
     try:
-        return usuario.perfilusuario.rol == "ADMIN"
+        perfil = PerfilUsuario.objects.get(usuario=request.user)
     except PerfilUsuario.DoesNotExist:
-        return False
-
-
-class PermisoPerfilUsuario(BasePermission):
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-
-        if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-
-        return es_administrador(request.user)
-
-    def has_object_permission(self, request, view, obj):
-        if es_administrador(request.user):
-            return True
-
-        return (
-            request.method in ("GET", "HEAD", "OPTIONS")
-            and obj.user_id == request.user.id
+        return Response(
+            {"error": "El usuario no tiene un perfil registrado."},
+            status=status.HTTP_404_NOT_FOUND,
         )
 
+    serializer = PerfilUsuarioSerializer(perfil)
 
-class PerfilUsuarioViewSet(viewsets.ModelViewSet):
+    return Response(
+        serializer.data,
+        status=status.HTTP_200_OK,
+    )
 
-    serializer_class = PerfilUsuarioSerializer
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, PermisoPerfilUsuario]
 
-    def get_queryset(self):
-        usuario = self.request.user
-
-        if es_administrador(usuario):
-            return PerfilUsuario.objects.select_related("user").all()
-
-        return PerfilUsuario.objects.select_related("user").filter(
-            user=usuario
+@api_view(["GET"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def listar_perfiles(request):
+    """
+    Permite al administrador consultar todos los perfiles.
+    """
+    if not es_administrador(request.user):
+        return Response(
+            {"error": "No tiene permisos para consultar todos los perfiles."},
+            status=status.HTTP_403_FORBIDDEN,
         )
 
+    perfiles = PerfilUsuario.objects.select_related("usuario").all()
+
+    serializer = PerfilUsuarioSerializer(
+        perfiles,
+        many=True,
+    )
+
+    return Response(
+        serializer.data,
+        status=status.HTTP_200_OK,
+    )
