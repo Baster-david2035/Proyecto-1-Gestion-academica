@@ -19,7 +19,24 @@ from django.urls import path, include
 from rest_framework.authtoken.views import obtain_auth_token
 
 urlpatterns = [
+    # Administración
     path('admin/', admin.site.urls),
-    # Ruta para obtener el token de autenticación (Login)
-    path('api/token/', obtain_auth_token, name='api_token_auth'),
+
+    # Autenticación
+    path('api/token/',obtain_auth_token,name='api_token_auth'),
+
+    # Usuarios
+    path('api/usuarios/',include('usuarios.urls')),
+
+    # Gestión académica
+    path('api/academico/',include('academico.urls')),
+
+    # Matrículas
+    path('api/matricula/',include('matricula.urls')),
+
+    # Evaluaciones y calificaciones
+    path('api/',include('calificaciones.urls')),
+
+    # Horarios
+    path('api/',include('horarios.urls')),
 ]
