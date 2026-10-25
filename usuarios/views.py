@@ -8,14 +8,13 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from usuarios.models import PerfilUsuario
-from usuarios.serializers import PerfilUsuarioSerializer
+from .models import PerfilUsuario
+from .serializers import PerfilUsuarioSerializer
 
 
 def obtener_rol(usuario):
     """
     Obtiene el rol del usuario desde su perfil.
-    Si es superusuario, lo considera administrador.
     """
     if usuario.is_superuser or usuario.is_staff:
         return "ADMINISTRADOR"
@@ -29,12 +28,15 @@ def obtener_rol(usuario):
 
 def es_administrador(usuario):
     """
-    Comprueba si el usuario tiene permisos de administrador.
+    Comprueba si el usuario es administrador.
     """
-    return usuario.is_authenticated and (
+    if not usuario.is_authenticated:
+        return False
+
+    return (
         usuario.is_superuser
         or usuario.is_staff
-        or obtener_rol(usuario) == "ADMINISTRADOR"
+        or obtener_rol(usuario) in ("ADMIN", "ADMINISTRADOR")
     )
 
 
@@ -43,7 +45,7 @@ def es_administrador(usuario):
 @permission_classes([IsAuthenticated])
 def mi_perfil(request):
     """
-    Permite consultar el perfil del usuario autenticado.
+    Consulta el perfil del usuario autenticado.
     """
     try:
         perfil = PerfilUsuario.objects.get(usuario=request.user)
@@ -54,7 +56,11 @@ def mi_perfil(request):
         )
 
     serializer = PerfilUsuarioSerializer(perfil)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+
+    return Response(
+        serializer.data,
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["GET"])
@@ -71,6 +77,13 @@ def listar_perfiles(request):
         )
 
     perfiles = PerfilUsuario.objects.select_related("usuario").all()
-    serializer = PerfilUsuarioSerializer(perfiles, many=True)
 
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    serializer = PerfilUsuarioSerializer(
+        perfiles,
+        many=True,
+    )
+
+    return Response(
+        serializer.data,
+        status=status.HTTP_200_OK,
+    )
