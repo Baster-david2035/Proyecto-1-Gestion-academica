@@ -2,11 +2,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 
 from rest_framework import status
-from rest_framework.decorators import (
-    api_view,
-    authentication_classes,
-    permission_classes,
-)
+from rest_framework.decorators import (api_view,authentication_classes,permission_classes)
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -22,17 +18,21 @@ from .serializers import (
 from usuarios.views import es_administrador, obtener_rol
 
 
+# Función auxiliar para comprobar si el usuario actual tiene permisos de modificación académica (restringido a administradores)
 def puede_modificar_academico(usuario):
     return es_administrador(usuario)
 
 
+# Función genérica reutilizable para aplicar búsqueda por texto, ordenamiento dinámico y paginación a cualquier queryset
 def responder_lista(request, queryset, serializer_class):
     """
     Aplica búsqueda, ordenamiento y paginación a una lista.
     """
+    # Captura el parámetro de búsqueda desde la URL (ej: ?search=ingenieria)
     busqueda = request.query_params.get("search")
 
     if busqueda:
+        # Detecta automáticamente todos los campos de tipo CharField o TextField del modelo para buscar en ellos
         campos = [
             campo.name
             for campo in queryset.model._meta.fields
@@ -44,22 +44,27 @@ def responder_lista(request, queryset, serializer_class):
 
         filtros = Q()
 
+        # Construye una consulta OR dinámicamente para buscar la cadena en cada uno de los campos de texto
         for campo in campos:
             filtros |= Q(**{f"{campo}__icontains": busqueda})
 
         if filtros:
             queryset = queryset.filter(filtros)
 
+    # Captura el parámetro de ordenamiento desde la URL (ej: ?ordering=nombre o ?ordering=-fecha_inicio)
     ordering = request.query_params.get("ordering")
 
     if ordering:
+        # Elimina el signo menos inicial (si existe) para validar puramente el nombre del campo en el modelo
         campo = ordering.lstrip("-")
 
+        # Obtiene un conjunto con los nombres válidos de todos los campos del modelo
         campos_validos = {
             campo_modelo.name
             for campo_modelo in queryset.model._meta.fields
         }
 
+        # Valida si el campo solicitado para ordenar realmente existe en el modelo
         if campo not in campos_validos:
             return Response(
                 {"error": "El campo de ordenamiento no es válido."},
@@ -68,6 +73,7 @@ def responder_lista(request, queryset, serializer_class):
 
         queryset = queryset.order_by(ordering)
 
+    # Bloque protegido para procesar la paginación (número de página y elementos por página)
     try:
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
@@ -75,6 +81,7 @@ def responder_lista(request, queryset, serializer_class):
         if page < 1 or page_size < 1:
             raise ValueError
 
+        # Limita el tamaño máximo de la página a 50 elementos para proteger el rendimiento
         page_size = min(page_size, 50)
 
     except (ValueError, TypeError):
@@ -83,12 +90,15 @@ def responder_lista(request, queryset, serializer_class):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Calcula el total de registros encontrados y los límites de la porción (slice) para la página actual
     total = queryset.count()
     inicio = (page - 1) * page_size
     resultados = queryset[inicio:inicio + page_size]
 
+    # Serializa el subconjunto de resultados obtenidos
     serializer = serializer_class(resultados, many=True)
 
+    # Retorna la respuesta estructurada con metadatos de paginación y los resultados
     return Response({
         "count": total,
         "page": page,
@@ -97,20 +107,25 @@ def responder_lista(request, queryset, serializer_class):
     })
 
 
+# Vista de API para listar (GET) y crear (POST) Carreras
 @api_view(["GET", "POST"])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])  # Requiere autenticación por token
+@permission_classes([IsAuthenticated])         # Exige sesión activa
 def listar_crear_carreras(request):
+    
+    # Manejo de petición GET: lista las carreras aplicando búsqueda, orden y paginación
     if request.method == "GET":
         queryset = Carrera.objects.all()
         return responder_lista(request, queryset, CarreraSerializer)
 
+    # Valida que el usuario tenga privilegios para crear registros académicos
     if not puede_modificar_academico(request.user):
         return Response(
             {"error": "Solo un administrador puede crear carreras."},
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    # Valida y guarda la nueva carrera enviada en el request
     serializer = CarreraSerializer(data=request.data)
 
     if serializer.is_valid():
@@ -127,6 +142,7 @@ def listar_crear_carreras(request):
     )
 
 
+# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) una Carrera específica por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -158,6 +174,7 @@ def detalle_carrera(request, pk):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Regla de negocio: No se puede eliminar una carrera si tiene cursos asociados (retorna conflicto HTTP 409)
     if carrera.curso_set.exists():
         return Response(
             {"error": "No se puede eliminar una carrera que tiene cursos asociados."},
@@ -169,10 +186,13 @@ def detalle_carrera(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# Vista de API para listar (GET) y crear (POST) Cursos
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def listar_crear_cursos(request):
+    
+    # Manejo de petición GET: lista y permite filtrar por carrera opcionalmente (?carrera=ID)
     if request.method == "GET":
         queryset = Curso.objects.all()
 
@@ -205,6 +225,7 @@ def listar_crear_cursos(request):
     )
 
 
+# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) un Curso específico por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -241,10 +262,12 @@ def detalle_curso(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# Vista de API para listar (GET) y crear (POST) Periodos Lectivos
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def listar_crear_periodos(request):
+    
     if request.method == "GET":
         queryset = PeriodoLectivo.objects.all()
 
@@ -276,6 +299,7 @@ def listar_crear_periodos(request):
     )
 
 
+# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) un Periodo Lectivo específico por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -312,10 +336,13 @@ def detalle_periodo(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# Vista de API para listar (GET) y crear (POST) Grupos académicos
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def listar_crear_grupos(request):
+    
+    # Manejo de petición GET: lista y permite filtrar por curso (?curso=ID) o periodo (?periodo=ID) de forma opcional
     if request.method == "GET":
         queryset = Grupo.objects.all()
 
@@ -352,6 +379,7 @@ def listar_crear_grupos(request):
     )
 
 
+# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) un Grupo específico por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
