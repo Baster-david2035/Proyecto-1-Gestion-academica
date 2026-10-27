@@ -154,22 +154,22 @@ class PeriodoLectivoSerializer(serializers.ModelSerializer):
 # Serializer para transformar el modelo Grupo en formato JSON (y viceversa)
 class GrupoSerializer(serializers.ModelSerializer):
     
-    # Campo de solo lectura para exponer el nombre del curso asociado
-    curso_nombre = serializers.ReadOnlyField(source='curso.nombre')
-    
-    # Campo de solo lectura para exponer el nombre del periodo lectivo asociado
-    periodo_nombre = serializers.ReadOnlyField(source='periodo.nombre')
-    
-    # Campo de solo lectura para obtener el nombre completo del profesor asignado 
-    # a través de la relación: profesor -> get_full_name().
+    curso_nombre = serializers.ReadOnlyField(
+        source='curso.nombre'
+    )
+
+    periodo_nombre = serializers.ReadOnlyField(
+        source='periodo.nombre'
+    )
+
     profesor_nombre = serializers.ReadOnlyField(
         source='profesor.get_full_name'
     )
 
     class Meta:
         model = Grupo
-        # Lista de campos expuestos por la API para la gestión de grupos académicos
-        fields = ['id',
+        fields = [
+            'id',
             'curso',
             'curso_nombre',
             'periodo',
@@ -177,4 +177,21 @@ class GrupoSerializer(serializers.ModelSerializer):
             'numero_grupo',
             'profesor',
             'profesor_nombre',
-            'cupo_maximo',]
+            'cupo_maximo',
+        ]
+
+    def validate_numero_grupo(self, value):
+        if value < 1:
+            raise serializers.ValidationError(
+                "El número de grupo debe ser mayor que cero."
+            )
+
+        return value
+
+    def validate_cupo_maximo(self, value):
+        if value < 1:
+            raise serializers.ValidationError(
+                "El cupo máximo debe ser al menos de un estudiante."
+            )
+
+        return value
