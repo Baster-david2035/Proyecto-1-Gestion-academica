@@ -1,41 +1,73 @@
 from rest_framework import serializers
 from .models import Evaluacion, Calificacion
+from decimal import Decimal
 
 
 # Serializer para transformar el modelo Evaluacion en formato JSON (y viceversa)
 class EvaluacionSerializer(serializers.ModelSerializer):
-    
-    grupo_detalle = serializers.ReadOnlyField(
-    source='grupo.__str__'
-)
 
-class Meta:
-    model = Evaluacion
-    fields = [
-        'id',
-        'grupo',
-        'grupo_detalle',
-        'nombre',
-        'porcentaje',
-    ]
+    grupo_detalle = serializers.ReadOnlyField(source='grupo.__str__')
 
-def validate_nombre(self, nombre):
-    nombre = nombre.strip()
+    class Meta:
+        model = Evaluacion
+        fields = ['id', 'grupo', 'grupo_detalle', 'nombre', 'porcentaje']
 
-    if not nombre:
-        raise serializers.ValidationError(
-            'El nombre de la evaluación no puede estar vacío.'
+    def validate_porcentaje(self, value):
+        if value <= Decimal('0'):
+            raise serializers.ValidationError(
+                "El porcentaje debe ser mayor que 0."
+            )
+
+        if value > Decimal('100'):
+            raise serializers.ValidationError(
+                "El porcentaje no puede superar el 100%."
+            )
+
+        return value
+
+    def validate(self, data):
+        grupo = data.get(
+            'grupo',
+            self.instance.grupo if self.instance else None
         )
 
-    return nombre
-
-def validate_porcentaje(self, porcentaje):
-    if porcentaje <= 0 or porcentaje > 100:
-        raise serializers.ValidationError(
-            'El porcentaje debe ser mayor que 0 y menor o igual a 100.'
+        porcentaje = data.get(
+            'porcentaje',
+            self.instance.porcentaje if self.instance else None
         )
 
-    return porcentaje
+        if grupo is None or porcentaje is None:
+            return data
+
+        # Obtener las evaluaciones que ya pertenecen al grupo.
+        evaluaciones = Evaluacion.objects.filter(grupo=grupo)
+
+        # Al actualizar, excluir la evaluación actual para no sumarla dos veces.
+        if self.instance:
+            evaluaciones = evaluaciones.exclude(pk=self.instance.pk)
+
+        # Sumar los porcentajes existentes.
+        total_actual = sum(
+            (
+                evaluacion.porcentaje
+                for evaluacion in evaluaciones
+            ),
+            Decimal('0')
+        )
+
+        # Sumar el porcentaje nuevo o actualizado.
+        total_nuevo = total_actual + porcentaje
+
+        if total_nuevo > Decimal('100'):
+            raise serializers.ValidationError({
+                'porcentaje': (
+                    f'El grupo ya tiene evaluaciones que suman '
+                    f'{total_actual}%. Con este cambio, el total sería '
+                    f'{total_nuevo}%, y no puede superar el 100%.'
+                )
+            })
+
+        return data
 
 
 # Serializer para transformar el modelo Calificacion en formato JSON (y viceversa)
