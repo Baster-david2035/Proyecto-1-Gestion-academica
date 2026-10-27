@@ -7,8 +7,34 @@ class CarreraSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Carrera
-        # Lista de campos expuestos por la API para gestionar las carreras
         fields = ['id', 'codigo', 'nombre', 'descripcion']
+
+    def validate_codigo(self, value):
+        value = value.strip().upper()
+
+        if not value:
+            raise serializers.ValidationError(
+                "El código de la carrera es obligatorio."
+            )
+
+        return value
+
+    def validate_nombre(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "El nombre de la carrera es obligatorio."
+            )
+
+        return value
+
+    def validate_descripcion(self, value):
+        if value is not None:
+            value = value.strip()
+
+        return value
+
 
 
 # Serializer para transformar el modelo Curso en formato JSON (y viceversa)
