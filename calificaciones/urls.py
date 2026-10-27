@@ -9,4 +9,5 @@ urlpatterns = [
     # Calificaciones
     path('calificaciones/',views.listar_crear_calificaciones,name='listar_crear_calificaciones'),
     path('calificaciones/<int:pk>/',views.detalle_calificacion,name='detalle_calificacion'),
+    path('califica/<int:grupo_id>/validar-porcentajes/',views.validar_porcentajes_grupo,name='validar_porcentajes_grupo'),
 ]

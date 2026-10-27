@@ -5,25 +5,66 @@ from .models import Matricula
 # Serializer para transformar el modelo Matricula en JSON (y viceversa).
 class MatriculaSerializer(serializers.ModelSerializer):
     
-    # Campo de solo lectura para exponer el nombre de usuario (username) del estudiante asociado.
-    # 'source="estudiante.username"' indica que el valor se obtiene navegando desde la relación 'estudiante' hacia su atributo 'username'.
-    estudiante_username = serializers.ReadOnlyField(source='estudiante.username')
-    
-    # Campo de solo lectura para exponer la representación en texto del grupo (__str__ del modelo Grupo).
-    # 'source="grupo.__str__"' toma el resultado del método __str__ del objeto grupo relacionado.
-    grupo_detalle = serializers.ReadOnlyField(source='grupo.__str__')
+    estudiante_username = serializers.ReadOnlyField(
+    source='estudiante.username'
+)
 
-    class Meta:
-        model = Matricula
-        # Lista de campos que se incluirán en la serialización y deserialización de la API
-        fields = [
-            'id',
-            'estudiante',
-            'estudiante_username',
-            'grupo',
-            'grupo_detalle',
-            'fecha_matricula',
-            'estado',
-        ]
-        # Campos que solo se pueden leer desde la API y no pueden ser modificados o enviados por el cliente en POST/PUT/PATCH
-        read_only_fields = ['fecha_matricula']
+grupo_detalle = serializers.ReadOnlyField(
+    source='grupo.__str__'
+)
+
+class Meta:
+    model = Matricula
+    fields = [
+        'id',
+        'estudiante',
+        'estudiante_username',
+        'grupo',
+        'grupo_detalle',
+        'fecha_matricula',
+        'estado',
+    ]
+    read_only_fields = ['fecha_matricula']
+
+def validate_estudiante(self, estudiante):
+    # Comprobar que el usuario tenga un perfil de estudiante.
+    perfil = getattr(estudiante, 'perfilusuario', None)
+
+    if perfil is None or perfil.rol != 'ESTUDIANTE':
+        raise serializers.ValidationError(
+            'El usuario seleccionado debe tener el rol ESTUDIANTE.'
+        )
+
+    return estudiante
+
+def validate(self, attrs):
+    # Obtener los datos nuevos o conservar los existentes al actualizar.
+    estudiante = attrs.get(
+        'estudiante',
+        getattr(self.instance, 'estudiante', None)
+    )
+    grupo = attrs.get(
+        'grupo',
+        getattr(self.instance, 'grupo', None)
+    )
+
+    # Impedir matrículas duplicadas del mismo estudiante en el grupo.
+    if estudiante is not None and grupo is not None:
+        matriculas = Matricula.objects.filter(
+            estudiante=estudiante,
+            grupo=grupo
+        )
+
+        # Al actualizar, excluir la matrícula actual.
+        if self.instance is not None:
+            matriculas = matriculas.exclude(pk=self.instance.pk)
+
+        if matriculas.exists():
+            raise serializers.ValidationError({
+                'grupo': (
+                    'Este estudiante ya tiene una matrícula '
+                    'registrada para ese grupo.'
+                )
+            })
+
+    return attrs
