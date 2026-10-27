@@ -5,14 +5,37 @@ from .models import Evaluacion, Calificacion
 # Serializer para transformar el modelo Evaluacion en formato JSON (y viceversa)
 class EvaluacionSerializer(serializers.ModelSerializer):
     
-    # Campo de solo lectura para exponer la representación en texto del grupo asociado 
-    # utilizando el método __str__ del modelo Grupo.
-    grupo_detalle = serializers.ReadOnlyField(source='grupo.__str__')
+    grupo_detalle = serializers.ReadOnlyField(
+    source='grupo.__str__'
+)
 
-    class Meta:
-        model = Evaluacion
-        # Lista de campos que se incluirán al serializar o deserializar las evaluaciones en la API
-        fields = ['id', 'grupo', 'grupo_detalle', 'nombre', 'porcentaje']
+class Meta:
+    model = Evaluacion
+    fields = [
+        'id',
+        'grupo',
+        'grupo_detalle',
+        'nombre',
+        'porcentaje',
+    ]
+
+def validate_nombre(self, nombre):
+    nombre = nombre.strip()
+
+    if not nombre:
+        raise serializers.ValidationError(
+            'El nombre de la evaluación no puede estar vacío.'
+        )
+
+    return nombre
+
+def validate_porcentaje(self, porcentaje):
+    if porcentaje <= 0 or porcentaje > 100:
+        raise serializers.ValidationError(
+            'El porcentaje debe ser mayor que 0 y menor o igual a 100.'
+        )
+
+    return porcentaje
 
 
 # Serializer para transformar el modelo Calificacion en formato JSON (y viceversa)
