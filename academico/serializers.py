@@ -105,8 +105,50 @@ class CursoSerializer(serializers.ModelSerializer):
 class PeriodoLectivoSerializer(serializers.ModelSerializer):
     class Meta:
         model = PeriodoLectivo
-        # Lista de campos expuestos para la gestión de periodos o ciclos lectivos
-        fields = ['id', 'nombre', 'fecha_inicio', 'fecha_fin', 'activo']
+        fields = [
+            'id',
+            'nombre',
+            'fecha_inicio',
+            'fecha_fin',
+            'activo',
+        ]
+
+    def validate_nombre(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "El nombre del periodo es obligatorio."
+            )
+
+        return value
+
+    def validate(self, data):
+        fecha_inicio = data.get(
+            'fecha_inicio',
+            self.instance.fecha_inicio
+            if self.instance else None
+        )
+
+        fecha_fin = data.get(
+            'fecha_fin',
+            self.instance.fecha_fin
+            if self.instance else None
+        )
+
+        if (
+            fecha_inicio is not None
+            and fecha_fin is not None
+            and fecha_fin < fecha_inicio
+        ):
+            raise serializers.ValidationError({
+                'fecha_fin':
+                    "La fecha de finalización no puede ser "
+                    "anterior a la fecha de inicio."
+            })
+
+        return data
+
 
 
 # Serializer para transformar el modelo Grupo en formato JSON (y viceversa)
