@@ -1,5 +1,9 @@
 from rest_framework import status
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,7 +15,7 @@ from .serializers import EvaluacionSerializer, CalificacionSerializer
 # Vista de API para listar (GET) y crear (POST) evaluaciones de un grupo
 @api_view(['GET', 'POST'])
 @authentication_classes([TokenAuthentication])  # Exige token de autenticación
-@permission_classes([IsAuthenticated])         # Exige que el usuario haya iniciado sesión
+@permission_classes([IsAuthenticated])  # Exige que el usuario haya iniciado sesión
 def listar_crear_evaluaciones(request):
 
     # Manejo de peticiones GET: lista y filtra las evaluaciones registradas
@@ -23,6 +27,19 @@ def listar_crear_evaluaciones(request):
         grupo_id = request.query_params.get('grupo')
 
         if grupo_id:
+            # Valida que el identificador del grupo sea un entero positivo
+            try:
+                grupo_id = int(grupo_id)
+
+                if grupo_id < 1:
+                    raise ValueError
+
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'El identificador del grupo debe ser un entero positivo.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             evaluaciones = evaluaciones.filter(grupo_id=grupo_id)
 
         # Ordena los resultados por ID de grupo y nombre de la evaluación alfabéticamente
@@ -36,11 +53,11 @@ def listar_crear_evaluaciones(request):
     serializer = EvaluacionSerializer(data=request.data)
 
     if serializer.is_valid():
-        serializer.save()
+        evaluacion = serializer.save()
 
         # Retorna la evaluación creada con el código HTTP 201 (Creado exitosamente)
         return Response(
-            serializer.data,
+            EvaluacionSerializer(evaluacion).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -51,7 +68,8 @@ def listar_crear_evaluaciones(request):
     )
 
 
-# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) una evaluación específica por su ID (pk)
+# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE)
+# una evaluación específica por su ID (pk)
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -80,9 +98,10 @@ def detalle_evaluacion(request, pk):
         )
 
         if serializer.is_valid():
-            serializer.save()
+            evaluacion = serializer.save()
+
             return Response(
-                serializer.data,
+                EvaluacionSerializer(evaluacion).data,
                 status=status.HTTP_200_OK,
             )
 
@@ -96,6 +115,93 @@ def detalle_evaluacion(request, pk):
 
     # Retorna una respuesta exitosa sin contenido (código HTTP 204)
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# Vista para validar si los porcentajes de las evaluaciones de un grupo suman 100 %
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def validar_porcentajes_grupo(request, grupo_id):
+
+    # Valida que el identificador del grupo sea un entero positivo
+    try:
+        grupo_id = int(grupo_id)
+
+        if grupo_id < 1:
+            raise ValueError
+
+    except (ValueError, TypeError):
+        return Response(
+            {'error': 'El identificador del grupo debe ser un entero positivo.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Obtiene las evaluaciones pertenecientes al grupo indicado
+    evaluaciones = Evaluacion.objects.filter(grupo_id=grupo_id)
+
+    # Verifica que el grupo tenga evaluaciones registradas
+    if not evaluaciones.exists():
+        return Response(
+            {
+                'valido': False,
+                'grupo_id': grupo_id,
+                'porcentaje_acumulado': '0.00',
+                'porcentaje_faltante': '100.00',
+                'mensaje': 'El grupo todavía no tiene evaluaciones registradas.',
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # Calcula la suma de los porcentajes de las evaluaciones del grupo
+    from decimal import Decimal
+
+    porcentaje_acumulado = sum(
+        (evaluacion.porcentaje for evaluacion in evaluaciones),
+        Decimal('0.00'),
+    )
+
+    # Calcula cuánto falta para alcanzar el 100 %
+    porcentaje_faltante = Decimal('100.00') - porcentaje_acumulado
+
+    # Comprueba que el porcentaje acumulado sea exactamente 100 %
+    if porcentaje_acumulado == Decimal('100.00'):
+        return Response(
+            {
+                'valido': True,
+                'grupo_id': grupo_id,
+                'porcentaje_acumulado': str(porcentaje_acumulado),
+                'porcentaje_faltante': '0.00',
+                'mensaje': 'Los porcentajes de las evaluaciones suman exactamente 100 %.',
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # Si la suma supera el 100 %, informa el exceso
+    if porcentaje_acumulado > Decimal('100.00'):
+        return Response(
+            {
+                'valido': False,
+                'grupo_id': grupo_id,
+                'porcentaje_acumulado': str(porcentaje_acumulado),
+                'porcentaje_excedido': str(
+                    porcentaje_acumulado - Decimal('100.00')
+                ),
+                'mensaje': 'Los porcentajes de las evaluaciones superan el 100 %.',
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # Si la suma es inferior al 100 %, informa cuánto falta
+    return Response(
+        {
+            'valido': False,
+            'grupo_id': grupo_id,
+            'porcentaje_acumulado': str(porcentaje_acumulado),
+            'porcentaje_faltante': str(porcentaje_faltante),
+            'mensaje': 'Los porcentajes de las evaluaciones todavía no suman 100 %.',
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
 # Vista de API para listar (GET) y registrar (POST) calificaciones de los estudiantes
@@ -117,11 +223,37 @@ def listar_crear_calificaciones(request):
         evaluacion_id = request.query_params.get('evaluacion')
 
         if matricula_id:
+            # Valida que el identificador de la matrícula sea un entero positivo
+            try:
+                matricula_id = int(matricula_id)
+
+                if matricula_id < 1:
+                    raise ValueError
+
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'El identificador de la matrícula debe ser un entero positivo.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             calificaciones = calificaciones.filter(
                 matricula_id=matricula_id,
             )
 
         if evaluacion_id:
+            # Valida que el identificador de la evaluación sea un entero positivo
+            try:
+                evaluacion_id = int(evaluacion_id)
+
+                if evaluacion_id < 1:
+                    raise ValueError
+
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'El identificador de la evaluación debe ser un entero positivo.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             calificaciones = calificaciones.filter(
                 evaluacion_id=evaluacion_id,
             )
@@ -180,7 +312,8 @@ def listar_crear_calificaciones(request):
     )
 
 
-# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) una calificación específica por su ID (pk)
+# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE)
+# una calificación específica por su ID (pk)
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
