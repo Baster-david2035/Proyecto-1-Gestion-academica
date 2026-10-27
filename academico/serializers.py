@@ -40,13 +40,12 @@ class CarreraSerializer(serializers.ModelSerializer):
 # Serializer para transformar el modelo Curso en formato JSON (y viceversa)
 class CursoSerializer(serializers.ModelSerializer):
     
-    # Campo de solo lectura para exponer el nombre de la carrera asociada 
-    # navegando a través de la relación: carrera -> nombre.
-    carrera_nombre = serializers.ReadOnlyField(source='carrera.nombre')
+    carrera_nombre = serializers.ReadOnlyField(
+        source='carrera.nombre'
+    )
 
     class Meta:
         model = Curso
-        # Lista de campos expuestos por la API para los cursos (incluyendo prerrequisitos y relación con carrera)
         fields = [
             'id',
             'codigo',
@@ -56,6 +55,50 @@ class CursoSerializer(serializers.ModelSerializer):
             'carrera_nombre',
             'prerrequisitos',
         ]
+
+    def validate_codigo(self, value):
+        value = value.strip().upper()
+
+        if not value:
+            raise serializers.ValidationError(
+                "El código del curso es obligatorio."
+            )
+
+        return value
+
+    def validate_nombre(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "El nombre del curso es obligatorio."
+            )
+
+        return value
+
+    def validate_creditos(self, value):
+        if value <= 0:
+            raise serializers.ValidationError(
+                "El curso debe tener al menos un crédito."
+            )
+
+        return value
+
+    def validate(self, data):
+        prerrequisitos = data.get(
+            'prerrequisitos',
+            self.instance.prerrequisitos.all()
+            if self.instance else []
+        )
+
+        # Un curso no puede ser su propio prerrequisito.
+        if self.instance and self.instance in prerrequisitos:
+            raise serializers.ValidationError({
+                'prerrequisitos':
+                    "Un curso no puede ser su propio prerrequisito."
+            })
+
+        return data
 
 
 # Serializer para transformar el modelo PeriodoLectivo en formato JSON (y viceversa)
