@@ -17,6 +17,16 @@ class CarreraSerializer(serializers.ModelSerializer):
                 "El código de la carrera es obligatorio."
             )
 
+        existing = Carrera.objects.filter(codigo=value)
+
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+
+        if existing.exists():
+            raise serializers.ValidationError(
+                "Ya existe una carrera con ese código."
+            )
+
         return value
 
     def validate_nombre(self, value):
@@ -62,6 +72,16 @@ class CursoSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError(
                 "El código del curso es obligatorio."
+            )
+
+        existing = Curso.objects.filter(codigo=value)
+
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+
+        if existing.exists():
+            raise serializers.ValidationError(
+                "Ya existe un curso con ese código."
             )
 
         return value

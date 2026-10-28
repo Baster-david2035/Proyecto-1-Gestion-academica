@@ -175,7 +175,7 @@ def detalle_carrera(request, pk):
         )
 
     # Regla de negocio: No se puede eliminar una carrera si tiene cursos asociados (retorna conflicto HTTP 409)
-    if carrera.curso_set.exists():
+    if carrera.cursos.exists():
         return Response(
             {"error": "No se puede eliminar una carrera que tiene cursos asociados."},
             status=status.HTTP_409_CONFLICT,
