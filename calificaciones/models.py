@@ -19,6 +19,15 @@ class Evaluacion(models.Model):
     # max_digits=5 permite números de hasta 5 dígitos en total, y decimal_places=2 reserva 2 decimales.
     porcentaje = models.DecimalField(max_digits=5, decimal_places=2)
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(porcentaje__gt=0)
+                & models.Q(porcentaje__lte=100),
+                name='evaluation_percentage_between_0_and_100',
+            ),
+        ]
+
     # Método especial para definir cómo se representará el objeto en texto (por ejemplo, en el panel de administración)
     def __str__(self):
         # Devuelve el nombre de la evaluación seguido del grupo entre paréntesis
@@ -42,6 +51,19 @@ class Calificacion(models.Model):
     
     # Campo numérico decimal para almacenar la calificación obtenida por el estudiante (Ej: 95.50).
     nota_obtenida = models.DecimalField(max_digits=5, decimal_places=2)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=('matricula', 'evaluacion'),
+                name='uniq_grade_per_enrollment_evaluation',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(nota_obtenida__gte=0)
+                & models.Q(nota_obtenida__lte=100),
+                name='grade_between_0_and_100',
+            ),
+        ]
 
     # Método especial para definir la representación en texto del objeto Calificacion
     def __str__(self):

@@ -23,6 +23,22 @@ def puede_modificar_academico(usuario):
     return es_administrador(usuario)
 
 
+def obtener_id_filtro(request, parametro):
+    valor = request.query_params.get(parametro)
+    if not valor:
+        return None, None
+    try:
+        identificador = int(valor)
+        if identificador < 1:
+            raise ValueError
+        return identificador, None
+    except (TypeError, ValueError):
+        return None, Response(
+            {parametro: "Debe ser un entero positivo."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
 # Función genérica reutilizable para aplicar búsqueda por texto, ordenamiento dinámico y paginación a cualquier queryset
 def responder_lista(request, queryset, serializer_class):
     """
@@ -56,7 +72,7 @@ def responder_lista(request, queryset, serializer_class):
 
     if ordering:
         # Elimina el signo menos inicial (si existe) para validar puramente el nombre del campo en el modelo
-        campo = ordering.lstrip("-")
+        campo = ordering[1:] if ordering.startswith("-") else ordering
 
         # Obtiene un conjunto con los nombres válidos de todos los campos del modelo
         campos_validos = {
@@ -65,7 +81,7 @@ def responder_lista(request, queryset, serializer_class):
         }
 
         # Valida si el campo solicitado para ordenar realmente existe en el modelo
-        if campo not in campos_validos:
+        if not campo or campo.startswith("-") or "," in ordering or campo not in campos_validos:
             return Response(
                 {"error": "El campo de ordenamiento no es válido."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -196,9 +212,10 @@ def listar_crear_cursos(request):
     if request.method == "GET":
         queryset = Curso.objects.all()
 
-        carrera_id = request.query_params.get("carrera")
-
-        if carrera_id:
+        carrera_id, error = obtener_id_filtro(request, "carrera")
+        if error:
+            return error
+        if carrera_id is not None:
             queryset = queryset.filter(carrera_id=carrera_id)
 
         return responder_lista(request, queryset, CursoSerializer)
@@ -346,13 +363,15 @@ def listar_crear_grupos(request):
     if request.method == "GET":
         queryset = Grupo.objects.all()
 
-        curso_id = request.query_params.get("curso")
-        periodo_id = request.query_params.get("periodo")
-
-        if curso_id:
+        curso_id, error = obtener_id_filtro(request, "curso")
+        if error:
+            return error
+        periodo_id, error = obtener_id_filtro(request, "periodo")
+        if error:
+            return error
+        if curso_id is not None:
             queryset = queryset.filter(curso_id=curso_id)
-
-        if periodo_id:
+        if periodo_id is not None:
             queryset = queryset.filter(periodo_id=periodo_id)
 
         return responder_lista(request, queryset, GrupoSerializer)

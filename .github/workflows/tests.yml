@@ -1,0 +1,81 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  mysql-tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: gestion_academica
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Check Django configuration
+        run: python manage.py check
+        env:
+          DB_ENGINE: mysql
+          MYSQL_DATABASE: gestion_academica
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ci-root-password
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: '3306'
+          MYSQL_TEST_DATABASE: test_gestion_academica
+          DJANGO_SECRET_KEY: ci-only-not-a-deploy-secret
+          DJANGO_DEBUG: 'False'
+          DJANGO_ALLOWED_HOSTS: 127.0.0.1,localhost
+      - name: Verify migrations
+        run: python manage.py makemigrations --check --dry-run
+        env:
+          DB_ENGINE: mysql
+          MYSQL_DATABASE: gestion_academica
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ci-root-password
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: '3306'
+          MYSQL_TEST_DATABASE: test_gestion_academica
+          DJANGO_SECRET_KEY: ci-only-not-a-deploy-secret
+          DJANGO_DEBUG: 'False'
+          DJANGO_ALLOWED_HOSTS: 127.0.0.1,localhost
+      - name: Apply migrations
+        run: python manage.py migrate --noinput
+        env:
+          DB_ENGINE: mysql
+          MYSQL_DATABASE: gestion_academica
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ci-root-password
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: '3306'
+          MYSQL_TEST_DATABASE: test_gestion_academica
+          DJANGO_SECRET_KEY: ci-only-not-a-deploy-secret
+          DJANGO_DEBUG: 'False'
+          DJANGO_ALLOWED_HOSTS: 127.0.0.1,localhost
+      - name: Run API tests against MySQL
+        run: python manage.py test
+        env:
+          DB_ENGINE: mysql
+          MYSQL_DATABASE: gestion_academica
+          MYSQL_USER: root
+          MYSQL_PASSWORD: ci-root-password
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: '3306'
+          MYSQL_TEST_DATABASE: test_gestion_academica
+          DJANGO_SECRET_KEY: ci-only-not-a-deploy-secret
+          DJANGO_DEBUG: 'False'
+          DJANGO_ALLOWED_HOSTS: 127.0.0.1,localhost

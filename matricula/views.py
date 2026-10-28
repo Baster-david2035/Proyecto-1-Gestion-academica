@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django.db.models import Q
 
 from rest_framework import status
@@ -9,6 +10,7 @@ from rest_framework.response import Response
 
 from .models import Matricula
 from .serializers import MatriculaSerializer
+from academico.models import Grupo
 from usuarios.views import es_administrador, obtener_rol
 
 
@@ -126,19 +128,26 @@ def listar_crear_matriculas(request):
     # Si el que matricula es un estudiante, se fuerza automáticamente a que el estudiante sea el usuario autenticado
     if rol == "ESTUDIANTE":
         datos["estudiante"] = request.user.pk
+        # La persona no puede crear una matrícula directamente retirada.
+        datos["estado"] = "MATRICULADO"
 
     # Pasa los datos al serializer para validarlos
-    serializer = MatriculaSerializer(data=datos)
+    try:
+        grupo_id = int(datos.get("grupo"))
+        if grupo_id < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return Response({"grupo": "Debe indicar un grupo válido."}, status=400)
 
-    if not serializer.is_valid():
-        # Si los datos son inválidos, retorna los errores con código HTTP 400
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Guarda la nueva matrícula en la base de datos
-    matricula = serializer.save()
+    with transaction.atomic():
+        try:
+            Grupo.objects.select_for_update().get(pk=grupo_id)
+        except Grupo.DoesNotExist:
+            return Response({"grupo": "El grupo no existe."}, status=400)
+        serializer = MatriculaSerializer(data=datos)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        matricula = serializer.save()
 
     # Retorna los datos de la matrícula creada con el código HTTP 201 (Creado exitosamente)
     return Response(
@@ -178,14 +187,23 @@ def detalle_matricula(request, pk):
             partial=request.method == "PATCH",  # Si es PATCH, permite actualizar solo algunos campos
         )
 
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        grupo_id = serializer.validated_data.get("grupo", matricula.grupo).pk
+        with transaction.atomic():
+            try:
+                Grupo.objects.select_for_update().get(pk=grupo_id)
+            except Grupo.DoesNotExist:
+                return Response({"grupo": "El grupo no existe."}, status=400)
+            serializer = MatriculaSerializer(
+                matricula,
+                data=request.data,
+                partial=request.method == "PATCH",
+            )
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             serializer.save()
-            return Response(serializer.data)
-
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        return Response(serializer.data)
 
     # Manejo de petición DELETE: elimina el registro de la matrícula de la base de datos
     matricula.delete()
