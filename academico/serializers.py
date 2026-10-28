@@ -17,6 +17,16 @@ class CarreraSerializer(serializers.ModelSerializer):
                 "El código de la carrera es obligatorio."
             )
 
+        existing = Carrera.objects.filter(codigo=value)
+
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+
+        if existing.exists():
+            raise serializers.ValidationError(
+                "Ya existe una carrera con ese código."
+            )
+
         return value
 
     def validate_nombre(self, value):
@@ -64,6 +74,16 @@ class CursoSerializer(serializers.ModelSerializer):
                 "El código del curso es obligatorio."
             )
 
+        existing = Curso.objects.filter(codigo=value)
+
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+
+        if existing.exists():
+            raise serializers.ValidationError(
+                "Ya existe un curso con ese código."
+            )
+
         return value
 
     def validate_nombre(self, value):
@@ -97,6 +117,27 @@ class CursoSerializer(serializers.ModelSerializer):
                 'prerrequisitos':
                     "Un curso no puede ser su propio prerrequisito."
             })
+
+        curso = data.get('carrera', getattr(self.instance, 'carrera', None))
+        if curso and any(item.carrera_id != curso.id for item in prerrequisitos):
+            raise serializers.ValidationError({
+                'prerrequisitos': 'Los prerrequisitos deben pertenecer a la misma carrera.'
+            })
+
+        if self.instance:
+            # A -> B -> ... -> A no es una secuencia académica válida.
+            objetivo = self.instance
+            pendientes = list(prerrequisitos)
+            visitados = set()
+            while pendientes:
+                actual = pendientes.pop()
+                if actual.pk == objetivo.pk:
+                    raise serializers.ValidationError({
+                        'prerrequisitos': 'La relación crea un ciclo de prerrequisitos.'
+                    })
+                if actual.pk not in visitados:
+                    visitados.add(actual.pk)
+                    pendientes.extend(actual.prerrequisitos.all())
 
         return data
 
@@ -195,3 +236,12 @@ class GrupoSerializer(serializers.ModelSerializer):
             )
 
         return value
+
+    def validate_profesor(self, profesor):
+        if profesor is not None:
+            perfil = getattr(profesor, 'perfilusuario', None)
+            if perfil is None or perfil.rol != 'PROFESOR':
+                raise serializers.ValidationError(
+                    'El usuario asignado debe tener el rol PROFESOR.'
+                )
+        return profesor

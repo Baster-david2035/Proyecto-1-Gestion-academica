@@ -29,6 +29,14 @@ class HorarioGrupo(models.Model):
     hora_fin = models.TimeField()
     # Campo de texto para almacenar el nombre o número del aula o laboratorio (Ej: Lab-01, Aula 104).
     aula = models.CharField(max_length=20)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(hora_fin__gt=models.F('hora_inicio')),
+                name='schedule_end_after_start',
+            ),
+        ]
     # Método especial para definir la representación en texto del objeto (por ejemplo, en el panel de administración o logs)
     def __str__(self):
         # Devuelve una cadena combinando el grupo, el día, el rango de horas y el aula entre paréntesis

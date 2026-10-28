@@ -19,7 +19,7 @@ def obtener_rol(usuario):
 
     try:
         # Intenta buscar el perfil asociado al usuario en la base de datos
-        perfil = PerfilUsuario.objects.get(usuario=usuario)
+        perfil = PerfilUsuario.objects.get(user=usuario)
         # Retorna el rol definido en el perfil convertido a mayúsculas
         return str(perfil.rol).upper()
     except PerfilUsuario.DoesNotExist:
@@ -50,7 +50,7 @@ def mi_perfil(request):
     """
     try:
         # Busca el perfil asociado al usuario autenticado (request.user)
-        perfil = PerfilUsuario.objects.get(usuario=request.user)
+        perfil = PerfilUsuario.objects.get(user=request.user)
     except PerfilUsuario.DoesNotExist:
         # Si el perfil no existe, responde con un código HTTP 404 (No encontrado) y un mensaje de error
         return Response(
@@ -82,7 +82,7 @@ def listar_perfiles(request):
         )
 
     # Obtiene todos los perfiles optimizando la consulta a la base de datos con select_related para traer el 'usuario' en una sola consulta
-    perfiles = PerfilUsuario.objects.select_related("usuario").all()
+    perfiles = PerfilUsuario.objects.select_related("user").all()
 
     # Serializa la lista completa de perfiles (many=True indica que se procesa un queryset/conjunto de elementos)
     serializer = PerfilUsuarioSerializer(perfiles,many=True)

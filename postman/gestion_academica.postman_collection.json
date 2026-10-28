@@ -1,0 +1,805 @@
+{
+  "info": {
+    "_postman_id": "48b5d305-2389-4f7a-9a12-d72718cbe7da",
+    "name": "Gestión Académica API",
+    "description": "Flujo de autenticación y pruebas CRUD de los módulos académicos. Use una base limpia y configure studentId y professorId con cuentas existentes creadas en Django Admin.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "Authorization",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "Token {{token}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "adminUsername",
+      "value": ""
+    },
+    {
+      "key": "adminPassword",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "studentId",
+      "value": ""
+    },
+    {
+      "key": "professorId",
+      "value": ""
+    },
+    {
+      "key": "careerId",
+      "value": ""
+    },
+    {
+      "key": "courseId",
+      "value": ""
+    },
+    {
+      "key": "periodId",
+      "value": ""
+    },
+    {
+      "key": "groupId",
+      "value": ""
+    },
+    {
+      "key": "enrollmentId",
+      "value": ""
+    },
+    {
+      "key": "evaluationId",
+      "value": ""
+    },
+    {
+      "key": "gradeId",
+      "value": ""
+    },
+    {
+      "key": "scheduleId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Autenticación y usuarios",
+      "item": [
+        {
+          "name": "Obtener token de administrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/token/",
+            "description": "Inicia la colección. Crea el superusuario con `python manage.py createsuperuser` y coloca sus credenciales en el entorno."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Devuelve 200 y un token', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().token).to.be.a('string'); });",
+                  "pm.environment.set('token', pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 200."
+        },
+        {
+          "name": "Consultar mi perfil",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/usuarios/perfil/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Perfil accesible', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 200."
+        },
+        {
+          "name": "Listar perfiles (administrador)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/usuarios/perfiles/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Lista perfiles', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 200."
+        }
+      ]
+    },
+    {
+      "name": "02 Académico",
+      "item": [
+        {
+          "name": "Listar carreras con búsqueda y página",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/carreras/?search=inform&page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear carrera",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"POST-01\",\n  \"nombre\": \"Carrera Postman\",\n  \"descripcion\": \"Registro de validación de la API\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/academico/carreras/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Carrera creada', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('careerId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Ver carrera creada",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/carreras/{{careerId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar carrera",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descripcion\": \"Actualizada desde Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/academico/carreras/{{careerId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar cursos",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/cursos/?carrera={{careerId}}&page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear curso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"POST-101\",\n  \"nombre\": \"Curso Postman\",\n  \"creditos\": 3,\n  \"carrera\": {{careerId}},\n  \"prerrequisitos\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/academico/cursos/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Curso creado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('courseId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Ver curso creado",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/cursos/{{courseId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar períodos",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/periodos/?page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear período",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Período Postman 2026\",\n  \"fecha_inicio\": \"2026-11-01\",\n  \"fecha_fin\": \"2027-03-31\",\n  \"activo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/academico/periodos/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Período creado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('periodId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Ver período creado",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/periodos/{{periodId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar grupos con filtros combinados",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/grupos/?curso={{courseId}}&periodo={{periodId}}&page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear grupo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"curso\": {{courseId}},\n  \"periodo\": {{periodId}},\n  \"numero_grupo\": 1,\n  \"profesor\": {{professorId}},\n  \"cupo_maximo\": 25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/academico/grupos/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Grupo creado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('groupId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Ver grupo creado",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/academico/grupos/{{groupId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Matrícula",
+      "item": [
+        {
+          "name": "Listar matrículas paginadas",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/matricula/?estado=MATRICULADO&grupo={{groupId}}&page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Matricular estudiante (administrador)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estudiante\": {{studentId}},\n  \"grupo\": {{groupId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/matricula/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Matrícula creada', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('enrollmentId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Consultar matrícula",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/matricula/{{enrollmentId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Calificaciones",
+      "item": [
+        {
+          "name": "Listar evaluaciones por grupo",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/evaluaciones/?grupo={{groupId}}&page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear evaluación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grupo\": {{groupId}},\n  \"nombre\": \"Evaluación Postman\",\n  \"porcentaje\": \"50.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/evaluaciones/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Evaluación creada', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('evaluationId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Validar que los porcentajes sumen 100",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/califica/{{groupId}}/validar-porcentajes/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar calificación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"matricula\": {{enrollmentId}},\n  \"evaluacion\": {{evaluationId}},\n  \"nota_obtenida\": \"85.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/calificaciones/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Calificación registrada', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('gradeId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Listar calificaciones por matrícula",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/calificaciones/?matricula={{enrollmentId}}&page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar calificación",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/calificaciones/{{gradeId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Horarios",
+      "item": [
+        {
+          "name": "Listar horarios filtrados",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/horarios/?grupo={{groupId}}&dia=LUN&page=1&page_size=10"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear horario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grupo\": {{groupId}},\n  \"dia\": \"LUN\",\n  \"hora_inicio\": \"08:00\",\n  \"hora_fin\": \"10:00\",\n  \"aula\": \"Aula Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/horarios/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Horario creado', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('scheduleId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "description": "Respuesta esperada: HTTP 201."
+        },
+        {
+          "name": "Consultar horario",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/horarios/{{scheduleId}}/"
+          },
+          "description": "Respuesta esperada: HTTP 200.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Respuesta HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
