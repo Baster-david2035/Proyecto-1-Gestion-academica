@@ -17,10 +17,41 @@ from .serializers import (
 
 from usuarios.views import es_administrador, obtener_rol
 
+def puede_ver_academico(usuario):
+    """
+    Administradores, profesores y estudiantes pueden ver (GET).
+    """
+    if not usuario.is_authenticated:
+        return False
+    rol = obtener_rol(usuario)
+    return rol in ["ADMINISTRADOR", "PROFESOR", "ESTUDIANTE", "ADMIN"]
 
-# Función auxiliar para comprobar si el usuario actual tiene permisos de modificación académica (restringido a administradores)
-def puede_modificar_academico(usuario):
-    return es_administrador(usuario)
+
+def puede_modificar_academico(usuario, metodo):
+    """
+    Controla quién puede hacer POST, PUT, PATCH o DELETE:
+    - Administrador: Control total sobre todo.
+    - Profesor: Puede crear o actualizar ciertos registros (ej. crear grupos o cursos), pero no borrar.
+    - Estudiante: No puede modificar nada por esta vía (solo ver o matricularse).
+    """
+    if not usuario.is_authenticated:
+        return False
+        
+    rol = obtener_rol(usuario)
+    
+    # 1. El administrador puede hacer absolutamente todo
+    if rol in ["ADMINISTRADOR", "ADMIN"] or usuario.is_superuser or usuario.is_staff:
+        return True
+        
+    # 2. Permisos para el profesor
+    if rol == "PROFESOR":
+        # Permitimos crear o actualizar (POST, PUT, PATCH), pero prohibimos eliminar (DELETE)
+        if metodo in ["POST", "PUT", "PATCH"]:
+            return True
+        return False
+        
+    # 3. Los estudiantes no tienen permisos de modificación por esta vía
+    return False
 
 
 def obtener_id_filtro(request, parametro):
