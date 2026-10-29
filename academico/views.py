@@ -75,11 +75,9 @@ def responder_lista(request, queryset, serializer_class):
     """
     Aplica búsqueda, ordenamiento y paginación a una lista.
     """
-    # Captura el parámetro de búsqueda desde la URL (ej: ?search=ingenieria)
     busqueda = request.query_params.get("search")
 
     if busqueda:
-        # Detecta automáticamente todos los campos de tipo CharField o TextField del modelo para buscar en ellos
         campos = [
             campo.name
             for campo in queryset.model._meta.fields
@@ -90,28 +88,21 @@ def responder_lista(request, queryset, serializer_class):
         ]
 
         filtros = Q()
-
-        # Construye una consulta OR dinámicamente para buscar la cadena en cada uno de los campos de texto
         for campo in campos:
             filtros |= Q(**{f"{campo}__icontains": busqueda})
 
         if filtros:
             queryset = queryset.filter(filtros)
 
-    # Captura el parámetro de ordenamiento desde la URL (ej: ?ordering=nombre o ?ordering=-fecha_inicio)
     ordering = request.query_params.get("ordering")
 
     if ordering:
-        # Elimina el signo menos inicial (si existe) para validar puramente el nombre del campo en el modelo
         campo = ordering[1:] if ordering.startswith("-") else ordering
-
-        # Obtiene un conjunto con los nombres válidos de todos los campos del modelo
         campos_validos = {
             campo_modelo.name
             for campo_modelo in queryset.model._meta.fields
         }
 
-        # Valida si el campo solicitado para ordenar realmente existe en el modelo
         if not campo or campo.startswith("-") or "," in ordering or campo not in campos_validos:
             return Response(
                 {"error": "El campo de ordenamiento no es válido."},
@@ -120,7 +111,6 @@ def responder_lista(request, queryset, serializer_class):
 
         queryset = queryset.order_by(ordering)
 
-    # Bloque protegido para procesar la paginación (número de página y elementos por página)
     try:
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
@@ -128,7 +118,6 @@ def responder_lista(request, queryset, serializer_class):
         if page < 1 or page_size < 1:
             raise ValueError
 
-        # Limita el tamaño máximo de la página a 50 elementos para proteger el rendimiento
         page_size = min(page_size, 50)
 
     except (ValueError, TypeError):
@@ -137,15 +126,12 @@ def responder_lista(request, queryset, serializer_class):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Calcula el total de registros encontrados y los límites de la porción (slice) para la página actual
     total = queryset.count()
     inicio = (page - 1) * page_size
     resultados = queryset[inicio:inicio + page_size]
 
-    # Serializa el subconjunto de resultados obtenidos
     serializer = serializer_class(resultados, many=True)
 
-    # Retorna la respuesta estructurada con metadatos de paginación y los resultados
     return Response({
         "count": total,
         "page": page,
@@ -154,42 +140,32 @@ def responder_lista(request, queryset, serializer_class):
     })
 
 
-# Vista de API para listar (GET) y crear (POST) Carreras
+# ==========================================
+# VISTAS DE CARRERAS
+# ==========================================
+
 @api_view(["GET", "POST"])
-@authentication_classes([TokenAuthentication])  # Requiere autenticación por token
-@permission_classes([IsAuthenticated])         # Exige sesión activa
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def listar_crear_carreras(request):
-    
-    # Manejo de petición GET: lista las carreras aplicando búsqueda, orden y paginación
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver las carreras."}, status=status.HTTP_403_FORBIDDEN)
         queryset = Carrera.objects.all()
         return responder_lista(request, queryset, CarreraSerializer)
 
-    # Valida que el usuario tenga privilegios para crear registros académicos
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede crear carreras."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    # Validar con la nueva función que incluye el request.method
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios suficientes para crear carreras."}, status=status.HTTP_403_FORBIDDEN)
 
-    # Valida y guarda la nueva carrera enviada en el request
     serializer = CarreraSerializer(data=request.data)
-
     if serializer.is_valid():
         objeto = serializer.save()
+        return Response(CarreraSerializer(objeto).data, status=status.HTTP_201_CREATED)
 
-        return Response(
-            CarreraSerializer(objeto).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-    return Response(
-        serializer.errors,
-        status=status.HTTP_400_BAD_REQUEST,
-    )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) una Carrera específica por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -197,52 +173,40 @@ def detalle_carrera(request, pk):
     carrera = get_object_or_404(Carrera, pk=pk)
 
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver esta carrera."}, status=status.HTTP_403_FORBIDDEN)
         return Response(CarreraSerializer(carrera).data)
 
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede modificar carreras."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios para modificar o eliminar carreras."}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method in ("PUT", "PATCH"):
-        serializer = CarreraSerializer(
-            carrera,
-            data=request.data,
-            partial=request.method == "PATCH",
-        )
-
+        serializer = CarreraSerializer(carrera, data=request.data, partial=request.method == "PATCH")
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    # Regla de negocio: No se puede eliminar una carrera si tiene cursos asociados (retorna conflicto HTTP 409)
     if carrera.cursos.exists():
-        return Response(
-            {"error": "No se puede eliminar una carrera que tiene cursos asociados."},
-            status=status.HTTP_409_CONFLICT,
-        )
+        return Response({"error": "No se puede eliminar una carrera que tiene cursos asociados."}, status=status.HTTP_409_CONFLICT)
 
     carrera.delete()
-
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# Vista de API para listar (GET) y crear (POST) Cursos
+# ==========================================
+# VISTAS DE CURSOS
+# ==========================================
+
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def listar_crear_cursos(request):
-    
-    # Manejo de petición GET: lista y permite filtrar por carrera opcionalmente (?carrera=ID)
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver los cursos."}, status=status.HTTP_403_FORBIDDEN)
+        
         queryset = Curso.objects.all()
-
         carrera_id, error = obtener_id_filtro(request, "carrera")
         if error:
             return error
@@ -251,29 +215,17 @@ def listar_crear_cursos(request):
 
         return responder_lista(request, queryset, CursoSerializer)
 
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede crear cursos."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios suficientes para crear cursos."}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = CursoSerializer(data=request.data)
-
     if serializer.is_valid():
         objeto = serializer.save()
+        return Response(CursoSerializer(objeto).data, status=status.HTTP_201_CREATED)
 
-        return Response(
-            CursoSerializer(objeto).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-    return Response(
-        serializer.errors,
-        status=status.HTTP_400_BAD_REQUEST,
-    )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) un Curso específico por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -281,73 +233,49 @@ def detalle_curso(request, pk):
     curso = get_object_or_404(Curso, pk=pk)
 
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver este curso."}, status=status.HTTP_403_FORBIDDEN)
         return Response(CursoSerializer(curso).data)
 
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede modificar cursos."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios para modificar o eliminar cursos."}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method in ("PUT", "PATCH"):
-        serializer = CursoSerializer(
-            curso,
-            data=request.data,
-            partial=request.method == "PATCH",
-        )
-
+        serializer = CursoSerializer(curso, data=request.data, partial=request.method == "PATCH")
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     curso.delete()
-
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# Vista de API para listar (GET) y crear (POST) Periodos Lectivos
+# ==========================================
+# VISTAS DE PERIODOS LECTIVOS
+# ==========================================
+
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def listar_crear_periodos(request):
-    
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver los períodos."}, status=status.HTTP_403_FORBIDDEN)
         queryset = PeriodoLectivo.objects.all()
+        return responder_lista(request, queryset, PeriodoLectivoSerializer)
 
-        return responder_lista(
-            request,
-            queryset,
-            PeriodoLectivoSerializer,
-        )
-
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede crear períodos."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios suficientes para crear períodos."}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = PeriodoLectivoSerializer(data=request.data)
-
     if serializer.is_valid():
         objeto = serializer.save()
+        return Response(PeriodoLectivoSerializer(objeto).data, status=status.HTTP_201_CREATED)
 
-        return Response(
-            PeriodoLectivoSerializer(objeto).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-    return Response(
-        serializer.errors,
-        status=status.HTTP_400_BAD_REQUEST,
-    )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) un Periodo Lectivo específico por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -355,45 +283,37 @@ def detalle_periodo(request, pk):
     periodo = get_object_or_404(PeriodoLectivo, pk=pk)
 
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver este período."}, status=status.HTTP_403_FORBIDDEN)
         return Response(PeriodoLectivoSerializer(periodo).data)
 
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede modificar períodos."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios para modificar o eliminar períodos."}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method in ("PUT", "PATCH"):
-        serializer = PeriodoLectivoSerializer(
-            periodo,
-            data=request.data,
-            partial=request.method == "PATCH",
-        )
-
+        serializer = PeriodoLectivoSerializer(periodo, data=request.data, partial=request.method == "PATCH")
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     periodo.delete()
-
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# Vista de API para listar (GET) y crear (POST) Grupos académicos
+# ==========================================
+# VISTAS DE GRUPOS
+# ==========================================
+
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def listar_crear_grupos(request):
-    
-    # Manejo de petición GET: lista y permite filtrar por curso (?curso=ID) o periodo (?periodo=ID) de forma opcional
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver los grupos."}, status=status.HTTP_403_FORBIDDEN)
+        
         queryset = Grupo.objects.all()
-
         curso_id, error = obtener_id_filtro(request, "curso")
         if error:
             return error
@@ -407,29 +327,17 @@ def listar_crear_grupos(request):
 
         return responder_lista(request, queryset, GrupoSerializer)
 
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede crear grupos."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios suficientes para crear grupos."}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = GrupoSerializer(data=request.data)
-
     if serializer.is_valid():
         objeto = serializer.save()
+        return Response(GrupoSerializer(objeto).data, status=status.HTTP_201_CREATED)
 
-        return Response(
-            GrupoSerializer(objeto).data,
-            status=status.HTTP_201_CREATED,
-        )
-
-    return Response(
-        serializer.errors,
-        status=status.HTTP_400_BAD_REQUEST,
-    )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Vista de API para consultar (GET), actualizar (PUT/PATCH) o eliminar (DELETE) un Grupo específico por su ID (pk)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -437,30 +345,19 @@ def detalle_grupo(request, pk):
     grupo = get_object_or_404(Grupo, pk=pk)
 
     if request.method == "GET":
+        if not puede_ver_academico(request.user):
+            return Response({"error": "No tienes permisos para ver este grupo."}, status=status.HTTP_403_FORBIDDEN)
         return Response(GrupoSerializer(grupo).data)
 
-    if not puede_modificar_academico(request.user):
-        return Response(
-            {"error": "Solo un administrador puede modificar grupos."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
+    if not puede_modificar_academico(request.user, request.method):
+        return Response({"error": "No tienes privilegios para modificar o eliminar grupos."}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method in ("PUT", "PATCH"):
-        serializer = GrupoSerializer(
-            grupo,
-            data=request.data,
-            partial=request.method == "PATCH",
-        )
-
+        serializer = GrupoSerializer(grupo, data=request.data, partial=request.method == "PATCH")
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     grupo.delete()
-
     return Response(status=status.HTTP_204_NO_CONTENT)
