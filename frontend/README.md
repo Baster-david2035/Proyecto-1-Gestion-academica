@@ -95,9 +95,9 @@ src/
 
 | Integrante | Rama | Responsabilidad |
 | --- | --- | --- |
-| Fabricio | `fabricio/base-auth-dashboard` | Base del proyecto, login/logout, rutas protegidas, layout, componentes compartidos, Dashboard, Usuarios y Horarios |
-| David | `david/academico` | Carreras, Cursos, Períodos y Grupos |
-| Gabriel | `gabriel/matricula-calificaciones` | Matrículas, Evaluaciones y Calificaciones |
+| Fabricio | `fabricio-frontend` | Base del proyecto, login/logout, rutas protegidas, layout, componentes compartidos, Dashboard, Usuarios y Horarios |
+| David | `david-academico` | Carreras, Cursos, Períodos y Grupos |
+| Gabriel | `gabriel-matricula-calificaciones` | Matrículas, Evaluaciones y Calificaciones |
 
 ## Matriz de pantallas y endpoints
 
