@@ -1,0 +1,40 @@
+body {
+  background-color: #f4f6f9;
+}
+
+/* Menú lateral: fijo en escritorio, desplegable en celular */
+.menu-lateral {
+  background-color: #ffffff;
+  border-right: 1px solid #dee2e6;
+  min-height: calc(100vh - 56px);
+}
+
+.menu-lateral .nav-link {
+  color: #343a40;
+  border-radius: 0.375rem;
+}
+
+.menu-lateral .nav-link.active {
+  background-color: #0d6efd;
+  color: #ffffff;
+}
+
+.menu-lateral .titulo-seccion {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #6c757d;
+  margin: 1rem 0 0.25rem 0.75rem;
+}
+
+@media (max-width: 767.98px) {
+  .menu-lateral {
+    min-height: auto;
+    border-right: none;
+    border-bottom: 1px solid #dee2e6;
+  }
+}
+
+.indicador {
+  font-size: 2rem;
+  font-weight: 700;
+}
